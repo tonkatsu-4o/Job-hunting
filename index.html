@@ -1,1 +1,931 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>就活管理 - Job Hunt Tracker</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts (Noto Sans JP) -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #f8fafc;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .input-base {
+            appearance: none; -webkit-appearance: none; display: block; width: 100%;
+            transition: all 0.2s; outline: none; border: 1px solid #e2e8f0;
+            box-sizing: border-box; background-color: #fff;
+        }
+        .input-base:focus {
+            border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+        }
+        
+        .company-card { transition: transform 0.15s, box-shadow 0.15s; }
+        .company-card:hover { transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background-color: #e2e8f0; }
+        .calendar-cell { background-color: white; min-height: 80px; transition: background-color 0.2s; }
+        .calendar-cell:hover { background-color: #f8fafc; }
+        .calendar-cell.selected { background-color: #eff6ff; box-shadow: inset 0 0 0 2px #3b82f6; }
+        @media (max-width: 640px) { .calendar-cell { min-height: 60px; } }
+
+        .color-btn { width: 2rem; height: 2rem; border-radius: 9999px; cursor: pointer; border: 2px solid transparent; transition: transform 0.1s; }
+        .color-btn:hover { transform: scale(1.1); }
+        .color-btn.active { border-color: #334155; box-shadow: 0 0 0 2px white, 0 0 0 4px #334155; }
+    </style>
+</head>
+<body class="text-slate-800 h-screen flex flex-col overflow-hidden text-sm sm:text-base">
+
+    <!-- ログイン用オーバーレイ -->
+    <div id="login-overlay" class="fixed inset-0 bg-slate-900/95 z-[100] flex flex-col items-center justify-center p-4 backdrop-blur-sm transition-opacity duration-300">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center">
+            <div class="w-16 h-16 bg-blue-600 text-white rounded-2xl flex items-center justify-center text-3xl mx-auto mb-5 shadow-lg">
+                <i class="fa-solid fa-briefcase"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-slate-800 mb-2 tracking-tight">就活管理</h1>
+            <p class="text-sm text-slate-500 mb-8 leading-relaxed">PC・スマートフォン間でデータを同期するために、ログインしてください。</p>
+            <button onclick="loginWithGoogle()" class="w-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-3 rounded-xl font-bold shadow-sm transition flex items-center justify-center gap-3">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="w-5 h-5">
+                Googleでログイン
+            </button>
+        </div>
+    </div>
+
+    <!-- ヘッダー -->
+    <header class="bg-white border-b border-slate-200 shadow-sm z-30 flex-none">
+        <div class="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 text-white p-1 rounded-md relative">
+                    <i class="fa-solid fa-briefcase text-sm"></i>
+                    <!-- クラウド同期状態インジケーター -->
+                    <div id="sync-status" class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-400 rounded-full border border-white" title="同期準備中..."></div>
+                </div>
+                <h1 class="text-base font-bold text-slate-800 tracking-tight">就活管理</h1>
+            </div>
+            
+            <div class="flex items-center gap-2 sm:gap-3">
+                <div class="flex bg-slate-100 p-1 rounded-lg">
+                    <button onclick="switchView('list')" id="btn-view-list" class="px-3 py-1 text-xs font-bold rounded-md transition shadow-sm bg-white text-blue-600" title="企業リスト">
+                        <i class="fa-solid fa-list mr-1"></i>
+                    </button>
+                    <button onclick="switchView('calendar')" id="btn-view-calendar" class="px-3 py-1 text-xs font-bold rounded-md transition text-slate-500 hover:text-slate-700" title="カレンダー">
+                        <i class="fa-regular fa-calendar mr-1"></i>
+                    </button>
+                    <button onclick="switchView('sites')" id="btn-view-sites" class="px-3 py-1 text-xs font-bold rounded-md transition text-slate-500 hover:text-slate-700" title="就活サイト管理">
+                        <i class="fa-solid fa-bookmark mr-1"></i>
+                    </button>
+                </div>
+
+                <div class="hidden sm:flex items-center gap-2 border-l border-slate-200 pl-3 ml-1">
+                    <button onclick="exportData()" class="text-slate-500 hover:text-blue-600 p-1.5 rounded transition" title="データのバックアップ(ダウンロード)">
+                        <i class="fa-solid fa-download"></i>
+                    </button>
+                </div>
+
+                <!-- ログアウトボタン -->
+                <button onclick="logout()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded transition ml-1" title="ログアウト">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                </button>
+
+                <!-- 追加ボタン -->
+                <button onclick="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow transition flex items-center gap-1.5 ml-1 whitespace-nowrap">
+                    <i class="fa-solid fa-plus"></i>
+                    <span class="hidden sm:inline">企業追加</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="flex-1 overflow-hidden relative bg-slate-50">
+        
+        <!-- リストビュー -->
+        <div id="view-list" class="absolute inset-0 overflow-y-auto p-3 sm:p-4 custom-scroll">
+            <div class="max-w-7xl mx-auto mb-4 flex flex-col sm:flex-row gap-2">
+                <div class="relative flex-1">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input type="text" id="filter-text" oninput="applyFilter()" placeholder="企業名、業界、コースで検索..." class="input-base pl-9 pr-3 py-2 rounded-lg text-sm w-full shadow-sm">
+                </div>
+                <select id="filter-status" onchange="applyFilter()" class="input-base px-3 py-2 rounded-lg text-sm bg-white cursor-pointer sm:w-48 text-slate-700 font-medium shadow-sm">
+                    <option value="">すべての進捗</option>
+                </select>
+            </div>
+
+            <div id="company-grid" class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                <!-- JSでカード生成 -->
+            </div>
+            <div id="empty-state" class="hidden flex-col items-center justify-center h-full text-slate-400 py-10">
+                <i class="fa-regular fa-folder-open text-4xl mb-3"></i>
+                <p class="text-sm" id="empty-state-text">該当する企業はありません</p>
+            </div>
+        </div>
+
+        <!-- カレンダービュー -->
+        <div id="view-calendar" class="absolute inset-0 overflow-hidden flex flex-col hidden bg-white">
+            <div class="flex items-center justify-between px-4 py-2 border-b border-slate-200 bg-slate-50 flex-none">
+                <h2 id="cal-month-title" class="text-lg font-bold text-slate-700"></h2>
+                <div class="flex gap-1">
+                    <button onclick="changeMonth(-1)" class="p-1.5 hover:bg-slate-100 rounded text-slate-600 transition"><i class="fa-solid fa-chevron-left"></i></button>
+                    <button onclick="resetToToday()" class="px-3 py-1.5 hover:bg-slate-100 rounded text-xs font-bold text-slate-600 transition border border-slate-200 ml-1 mr-1">今日</button>
+                    <button onclick="changeMonth(1)" class="p-1.5 hover:bg-slate-100 rounded text-slate-600 transition"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+            </div>
+
+            <div id="day-detail-panel" class="bg-blue-50/50 border-b border-slate-200 px-4 py-3 flex-none min-h-[80px] transition-all">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="flex-1 overflow-hidden">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span id="selected-date-display" class="font-bold text-lg text-slate-800"></span>
+                            <span id="selected-date-weekday" class="text-xs font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-600"></span>
+                        </div>
+                        <div id="selected-day-events" class="flex flex-wrap gap-2 text-sm text-slate-500">
+                        </div>
+                    </div>
+                    <button onclick="openCompanySelector()" class="flex-none bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg text-xs font-bold shadow-sm transition flex items-center justify-center gap-2 whitespace-nowrap">
+                        <i class="fa-solid fa-plus-circle"></i> 予定を追加
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-500 text-center py-1 flex-none">
+                <div class="text-red-500">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="text-blue-500">土</div>
+            </div>
+            <div id="calendar-body" class="calendar-grid flex-1 overflow-y-auto custom-scroll pb-20">
+            </div>
+        </div>
+
+        <!-- 就活サイト管理ビュー -->
+        <div id="view-sites" class="absolute inset-0 overflow-y-auto p-3 sm:p-4 custom-scroll hidden bg-slate-50">
+            <div class="max-w-7xl mx-auto mb-4 flex justify-between items-center">
+                <h2 class="text-base font-bold text-slate-700"><i class="fa-solid fa-bookmark text-blue-500 mr-2"></i>就活サイト管理</h2>
+                <button onclick="openSiteModal()" class="bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-plus"></i> サイト追加
+                </button>
+            </div>
+            <div id="site-grid" class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            </div>
+            <div id="site-empty-state" class="hidden flex-col items-center justify-center h-full text-slate-400 py-10">
+                <i class="fa-regular fa-bookmark text-4xl mb-3"></i>
+                <p class="text-sm">登録されたサイトはありません</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- 各種モーダル等 (既存実装と同一のため簡略化せずに記述) -->
+    <!-- 企業選択モーダル (予定追加用) -->
+    <div id="company-selector-modal" class="fixed inset-0 bg-slate-900/50 z-[70] hidden flex items-center justify-center p-4 backdrop-blur-sm opacity-0 transition-opacity duration-200">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-sm transform scale-95 transition-transform duration-200 overflow-hidden flex flex-col max-h-[80vh]">
+            <div class="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 class="font-bold text-slate-700 text-sm">予定を追加する企業を選択</h3>
+                <button onclick="closeCompanySelector()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="p-2 overflow-y-auto custom-scroll flex-1">
+                <div id="company-selector-list" class="space-y-1"></div>
+            </div>
+            <div class="p-3 border-t border-slate-100 bg-slate-50 text-center">
+                <button onclick="openModal(null, 'schedule', selectedDateStr); closeCompanySelector()" class="text-blue-600 text-xs font-bold hover:underline">
+                    <i class="fa-solid fa-plus mr-1"></i>新しい企業を追加
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 未保存警告モーダル -->
+    <div id="unsaved-warning-modal" class="fixed inset-0 bg-slate-900/60 z-[80] hidden flex items-center justify-center p-4 backdrop-blur-sm opacity-0 transition-opacity duration-200">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm transform scale-95 transition-transform duration-200 overflow-hidden flex flex-col p-5">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="bg-red-100 text-red-600 p-2 rounded-full flex-none">
+                    <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                </div>
+                <h3 class="font-bold text-slate-800 text-base">保存されていない変更があります</h3>
+            </div>
+            <p class="text-sm text-slate-600 mb-6">このまま閉じると、編集した内容は破棄されます。本当に閉じてもよろしいですか？</p>
+            <div class="flex justify-end gap-3">
+                <button onclick="hideUnsavedWarning()" class="px-4 py-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium transition">編集に戻る</button>
+                <button onclick="forceCloseModal()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold shadow transition">破棄して閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- メインモーダル (企業編集・追加) -->
+    <div id="modal" class="fixed inset-0 bg-slate-900/50 z-50 hidden flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl h-[90vh] sm:h-[85vh] flex flex-col transform scale-100 transition-transform duration-300 overflow-hidden" id="modal-content">
+            <div class="flex justify-between items-center px-4 py-3 border-b border-slate-100 flex-none">
+                <h2 id="modal-title" class="text-base font-bold text-slate-800">企業編集</h2>
+                <button onclick="closeModal(true)" class="text-slate-400 hover:text-slate-600 w-8 h-8 rounded-full hover:bg-slate-100 transition flex items-center justify-center"><i class="fa-solid fa-times"></i></button>
+            </div>
+
+            <div class="flex border-b border-slate-200 px-4 gap-4 sm:gap-6 flex-none bg-slate-50 overflow-x-auto">
+                <button type="button" onclick="switchModalTab('basic')" id="tab-btn-basic" class="py-3 text-sm font-bold text-blue-600 border-b-2 border-blue-600 transition whitespace-nowrap">基本情報</button>
+                <button type="button" onclick="switchModalTab('flow')" id="tab-btn-flow" class="py-3 text-sm font-bold text-slate-500 hover:text-slate-700 transition whitespace-nowrap">採用フロー</button>
+                <button type="button" onclick="switchModalTab('schedule')" id="tab-btn-schedule" class="py-3 text-sm font-bold text-slate-500 hover:text-slate-700 transition whitespace-nowrap">スケジュール</button>
+            </div>
+            
+            <div class="flex-1 overflow-hidden relative">
+                <form id="app-form" onsubmit="saveApplication(event)" class="h-full flex flex-col">
+                    <input type="hidden" id="app-id">
+                    <input type="hidden" id="app-color-input" value="bg-slate-500">
+
+                    <!-- 基本情報タブ -->
+                    <div id="tab-basic" class="tab-content flex-1 overflow-y-auto p-4 space-y-5 custom-scroll">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="sm:col-span-2">
+                                <label class="block text-xs font-bold text-slate-500 mb-1">企業名 <span class="text-red-500">*</span></label>
+                                <input type="text" id="app-name" required class="input-base px-3 py-2 rounded font-bold text-lg" placeholder="株式会社〇〇">
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="block text-xs font-bold text-slate-500 mb-2">テーマカラー</label>
+                                <div id="color-palette" class="flex flex-wrap gap-2"></div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1">業界タグ</label>
+                                <input type="text" id="app-industry" class="input-base px-3 py-2 rounded text-sm" placeholder="IT, メーカー">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1">志望コース・部門</label>
+                                <input type="text" id="app-course" class="input-base px-3 py-2 rounded text-sm" placeholder="総合職, SE, 開発部など">
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="block text-xs font-bold text-slate-500 mb-1">現在の進捗</label>
+                                <select id="app-current-step" class="input-base px-3 py-2 rounded text-sm bg-white cursor-pointer font-medium text-blue-600"></select>
+                            </div>
+                        </div>
+                        <div class="bg-slate-50 p-4 rounded border border-slate-200 space-y-3">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1"><i class="fa-solid fa-link mr-1"></i>マイページURL</label>
+                                <input type="url" id="app-url" class="input-base px-3 py-1.5 rounded text-sm font-mono text-slate-600" placeholder="https://...">
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1">ログインID</label>
+                                    <input type="text" id="app-login-id" class="input-base px-3 py-1.5 rounded text-sm font-mono" placeholder="ID">
+                                </div>
+                                <div class="relative">
+                                    <label class="block text-xs font-bold text-slate-500 mb-1">パスワード</label>
+                                    <input type="text" id="app-login-pass" class="input-base px-3 py-1.5 rounded text-sm font-mono" placeholder="Password">
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">エントリーシート (ES)</label>
+                            <textarea id="app-es" rows="8" class="input-base px-3 py-2 rounded text-sm font-mono leading-relaxed" placeholder="自己PR、志望動機、ガクチカなどを入力..."></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">メモ (その他)</label>
+                            <textarea id="app-note" rows="3" class="input-base px-3 py-2 rounded text-sm" placeholder="メモを入力..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- 採用フロータブ -->
+                    <div id="tab-flow" class="tab-content hidden flex-1 overflow-y-auto p-4 custom-scroll bg-slate-50">
+                        <div class="bg-white p-4 rounded border border-slate-200 shadow-sm mb-4">
+                            <label class="block text-xs font-bold text-slate-500 mb-2">ステップを追加</label>
+                            <div class="flex gap-2 mb-3 flex-wrap">
+                                <button type="button" onclick="addFlowStep('書類選考')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-xs border border-slate-200 transition">書類選考</button>
+                                <button type="button" onclick="addFlowStep('一次面接')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-xs border border-slate-200 transition">一次面接</button>
+                                <button type="button" onclick="addFlowStep('二次面接')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-xs border border-slate-200 transition">二次面接</button>
+                                <button type="button" onclick="addFlowStep('最終面接')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-xs border border-slate-200 transition">最終面接</button>
+                                <button type="button" onclick="addFlowStep('適性検査')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-xs border border-slate-200 transition">適性検査</button>
+                                <button type="button" onclick="addFlowStep('内定')" class="px-2 py-1 bg-green-50 hover:bg-green-100 text-green-700 rounded text-xs border border-green-200 font-bold transition">内定</button>
+                                <button type="button" onclick="addFlowStep('不採用')" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs border border-gray-200 transition">不採用</button>
+                                <button type="button" onclick="addFlowStep('辞退')" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs border border-gray-200 transition">辞退</button>
+                            </div>
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <input type="text" id="custom-step-name" class="input-base sm:flex-1 px-3 py-1.5 rounded text-sm mb-2 sm:mb-0" placeholder="カスタムステップ名">
+                                <button type="button" onclick="addFlowStep(document.getElementById('custom-step-name').value)" class="w-full sm:w-auto px-4 py-1.5 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-700 transition">追加</button>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <label class="block text-xs font-bold text-slate-500">現在のフロー (上から順に進行)</label>
+                            <ul id="flow-list" class="space-y-2"></ul>
+                        </div>
+                    </div>
+
+                    <!-- スケジュールタブ -->
+                    <div id="tab-schedule" class="tab-content hidden flex-1 overflow-y-auto p-4 custom-scroll bg-slate-50">
+                        <div class="bg-white p-4 rounded border border-slate-200 shadow-sm mb-4 w-full overflow-hidden">
+                            <label class="block text-xs font-bold text-slate-500 mb-2">カレンダーに予定を追加</label>
+                            <div class="space-y-3 mb-3">
+                                <div>
+                                    <label class="block text-[10px] text-slate-400 mb-1">開始日</label>
+                                    <div class="w-full">
+                                        <input type="date" id="event-date-start" class="input-base px-3 py-1.5 rounded text-sm w-full">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] text-slate-400 mb-1">終了日 (任意)</label>
+                                    <div class="w-full">
+                                        <input type="date" id="event-date-end" class="input-base px-3 py-1.5 rounded text-sm w-full">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <input type="text" id="event-title" class="input-base sm:flex-1 px-3 py-1.5 rounded text-sm mb-2 sm:mb-0" placeholder="内容 (例: 夏インターン)">
+                                <button type="button" onclick="addEvent()" class="w-full sm:w-auto bg-blue-600 text-white px-4 py-1.5 rounded text-xs font-bold hover:bg-blue-700 transition">追加</button>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <label class="block text-xs font-bold text-slate-500">登録済みスケジュール</label>
+                            <ul id="event-list" class="space-y-2"></ul>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="flex justify-between items-center p-4 border-t border-slate-100 bg-white flex-none">
+                <button type="button" id="delete-btn" onclick="deleteApplication()" class="text-red-500 hover:text-white border border-red-200 hover:bg-red-500 font-medium px-3 py-1.5 rounded text-xs transition flex items-center gap-1">
+                    <i class="fa-solid fa-trash-can"></i> 削除
+                </button>
+                <div class="flex gap-2 ml-auto">
+                    <button type="button" onclick="closeModal(true)" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded text-sm font-medium transition">キャンセル</button>
+                    <button type="submit" form="app-form" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-bold shadow transition">
+                        保存する
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 就活サイト追加・編集用モーダル -->
+    <div id="site-modal" class="fixed inset-0 bg-slate-900/50 z-50 hidden flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col transform scale-100 transition-transform duration-300 overflow-hidden">
+            <div class="flex justify-between items-center px-4 py-3 border-b border-slate-100 flex-none">
+                <h2 class="text-base font-bold text-slate-800"><i class="fa-solid fa-bookmark text-blue-500 mr-2"></i>サイト情報</h2>
+                <button onclick="closeSiteModal()" class="text-slate-400 hover:text-slate-600 w-8 h-8 rounded-full hover:bg-slate-100 transition flex items-center justify-center"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="p-4 overflow-y-auto custom-scroll space-y-4">
+                <input type="hidden" id="site-id">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">サイト名 <span class="text-red-500">*</span></label>
+                    <input type="text" id="site-name" required class="input-base px-3 py-2 rounded font-bold text-base" placeholder="マイナビ, リクナビ等">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">URL <span class="text-red-500">*</span></label>
+                    <input type="url" id="site-url" required class="input-base px-3 py-2 rounded text-sm font-mono text-slate-600" placeholder="https://...">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">ログインID</label>
+                        <input type="text" id="site-login-id" class="input-base px-3 py-1.5 rounded text-sm font-mono" placeholder="ID / メールアドレス">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">パスワード</label>
+                        <input type="text" id="site-login-pass" class="input-base px-3 py-1.5 rounded text-sm font-mono" placeholder="Password">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">メモ</label>
+                    <textarea id="site-note" rows="3" class="input-base px-3 py-2 rounded text-sm" placeholder="メモを入力..."></textarea>
+                </div>
+            </div>
+            <div class="flex justify-between items-center p-4 border-t border-slate-100 bg-slate-50 flex-none">
+                <button type="button" id="site-delete-btn" onclick="deleteSite()" class="text-red-500 hover:text-white border border-red-200 hover:bg-red-500 font-medium px-3 py-1.5 rounded text-xs transition flex items-center gap-1 hidden">
+                    <i class="fa-solid fa-trash-can"></i> 削除
+                </button>
+                <div class="flex gap-2 ml-auto">
+                    <button type="button" onclick="closeSiteModal()" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded text-sm font-medium transition">キャンセル</button>
+                    <button type="button" onclick="saveSite()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-bold shadow transition">
+                        保存する
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知トースト -->
+    <div id="toast" class="fixed bottom-6 right-6 bg-slate-800 text-white px-5 py-3 rounded shadow-xl transform translate-y-20 opacity-0 transition-all duration-300 z-[90] flex items-center gap-3 pointer-events-none">
+        <i class="fa-solid fa-check-circle text-green-400"></i>
+        <span id="toast-message" class="font-medium text-sm">完了しました</span>
+    </div>
+
+    <!-- Firebase SDK (ES Modules) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+
+        // ==========================================
+        // Firebase 設定
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyCUaM5fWkL7bzQe7LErrCSbY36oTd3a6CI",
+            authDomain: "job-9b8a1.firebaseapp.com",
+            projectId: "job-9b8a1",
+            storageBucket: "job-9b8a1.firebasestorage.app",
+            messagingSenderId: "851672541313",
+            appId: "1:851672541313:web:e5c1fe1245977b4eae4580",
+            measurementId: "G-9HV6101BSC"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const provider = new GoogleAuthProvider();
+        
+        // Canvasのルール制約に基づく統一AppID (変更不要)
+        const APP_ID = "job_tracker_v1"; 
+
+        // ==========================================
+        // 定数・State
+        // ==========================================
+        const DEFAULT_FLOW = ['エントリー', '書類選考', '一次面接', '最終面接', '内定', '不採用', '辞退'];
+        const STATUS_BADGE_STYLES = {
+            'エントリー': 'bg-blue-100 text-blue-700', '書類選考': 'bg-indigo-100 text-indigo-700',
+            '適性検査': 'bg-cyan-100 text-cyan-700', '一次面接': 'bg-purple-100 text-purple-700',
+            '二次面接': 'bg-fuchsia-100 text-fuchsia-700', '最終面接': 'bg-rose-100 text-rose-700',
+            '内定': 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+            '不採用': 'bg-slate-200 text-slate-600', '辞退': 'bg-slate-200 text-slate-600'
+        };
+        const COMPANY_COLORS = [
+            'bg-slate-500', 'bg-red-500', 'bg-orange-500', 'bg-amber-500', 'bg-yellow-500', 'bg-lime-500', 'bg-green-500', 'bg-emerald-500',
+            'bg-teal-500', 'bg-cyan-500', 'bg-sky-500', 'bg-blue-500', 'bg-indigo-500', 'bg-violet-500', 'bg-purple-500', 'bg-fuchsia-500',
+            'bg-pink-500', 'bg-rose-500'
+        ];
+
+        let applications = []; let jobSites = []; let currentCalendarDate = new Date(); let selectedDateStr = new Date().toISOString().split('T')[0]; 
+        let editingAppId = null; let editingSiteId = null; let editingFlow = []; let editingEvents = []; let editingColor = 'bg-slate-500'; let initialFormState = null;
+        let currentUser = null; let unsubApps = null; let unsubSites = null;
+
+        // ==========================================
+        // 認証と初期化ロジック
+        // ==========================================
+        function loginWithGoogle() {
+            signInWithPopup(auth, provider).catch(error => {
+                console.error("Login Error:", error);
+                alert("ログインに失敗しました: " + error.message + "\n※Firebaseコンソールで対象ドメインが「承認済みドメイン」に追加されているか確認してください。");
+            });
+        }
+
+        function logout() {
+            if(confirm("ログアウトしますか？")) {
+                signOut(auth);
+            }
+        }
+
+        onAuthStateChanged(auth, async (user) => {
+            const overlay = document.getElementById('login-overlay');
+            if (user) {
+                currentUser = user;
+                overlay.classList.add('opacity-0');
+                setTimeout(() => overlay.classList.add('hidden'), 300);
+                
+                await migrateFromLocalStorage(user.uid);
+                setupListeners(user.uid);
+                updateSyncStatus('success');
+            } else {
+                currentUser = null;
+                overlay.classList.remove('hidden');
+                setTimeout(() => overlay.classList.remove('opacity-0'), 10);
+
+                if (unsubApps) unsubApps();
+                if (unsubSites) unsubSites();
+                applications = []; jobSites = [];
+                updateFilterOptions(); renderList(); renderCalendar(); renderDayDetail(); renderSites();
+                updateSyncStatus('error');
+            }
+        });
+
+        function updateSyncStatus(status) {
+            const indicator = document.getElementById('sync-status');
+            indicator.className = 'absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border border-white transition-colors duration-300';
+            if (status === 'success') {
+                indicator.classList.add('bg-green-500'); indicator.title = "クラウド同期中";
+            } else if (status === 'error') {
+                indicator.classList.add('bg-red-500'); indicator.title = "未ログイン / 同期オフ";
+            } else {
+                indicator.classList.add('bg-yellow-400'); indicator.title = "同期準備中...";
+            }
+        }
+
+        // 古いlocalStorageデータがあればFirestoreに一括アップロードして削除する
+        async function migrateFromLocalStorage(userId) {
+            const oldAppsStr = localStorage.getItem('job_tracker_v9') || localStorage.getItem('job_tracker_v8');
+            const oldSitesStr = localStorage.getItem('job_tracker_sites_v1');
+            let migrated = false;
+
+            if (oldAppsStr) {
+                try {
+                    const parsedApps = JSON.parse(oldAppsStr);
+                    const promises = parsedApps.map(appData => {
+                        const docId = appData.id || crypto.randomUUID();
+                        const docRef = doc(db, 'artifacts', APP_ID, 'users', userId, 'applications', docId);
+                        return setDoc(docRef, { ...appData, id: docId });
+                    });
+                    await Promise.all(promises);
+                    localStorage.removeItem('job_tracker_v9');
+                    localStorage.removeItem('job_tracker_v8');
+                    migrated = true;
+                } catch(e) { console.error("Migrate Apps Error:", e); }
+            }
+            if (oldSitesStr) {
+                try {
+                    const parsedSites = JSON.parse(oldSitesStr);
+                    const promises = parsedSites.map(siteData => {
+                        const docId = siteData.id || crypto.randomUUID();
+                        const docRef = doc(db, 'artifacts', APP_ID, 'users', userId, 'jobSites', docId);
+                        return setDoc(docRef, { ...siteData, id: docId });
+                    });
+                    await Promise.all(promises);
+                    localStorage.removeItem('job_tracker_sites_v1');
+                    migrated = true;
+                } catch(e) { console.error("Migrate Sites Error:", e); }
+            }
+            if (migrated) showToast("ローカルデータをクラウドに移行しました");
+        }
+
+        // ==========================================
+        // Firestore データリスナー
+        // ==========================================
+        function setupListeners(userId) {
+            if (unsubApps) unsubApps();
+            if (unsubSites) unsubSites();
+
+            const appsRef = collection(db, 'artifacts', APP_ID, 'users', userId, 'applications');
+            unsubApps = onSnapshot(appsRef, (snapshot) => {
+                applications = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+                applications.forEach(app => {
+                    if (!app.flowSteps) app.flowSteps = [...DEFAULT_FLOW];
+                    if (!app.events) app.events = [];
+                    if (!app.color) app.color = 'bg-slate-500';
+                    if (!app.esContent) app.esContent = ''; 
+                    if (!app.course) app.course = ''; 
+                    if (app.color.includes('-100')) app.color = app.color.replace('-100', '-500');
+                    app.events.forEach(evt => { if (evt.date && !evt.startDate) { evt.startDate = evt.date; delete evt.date; } });
+                    if (app.status && !app.flowSteps.includes(app.status)) app.flowSteps.unshift(app.status);
+                });
+                updateFilterOptions(); renderList(); renderCalendar(); renderDayDetail();
+            }, (error) => { console.error("Apps Sync Error:", error); updateSyncStatus('error'); });
+
+            const sitesRef = collection(db, 'artifacts', APP_ID, 'users', userId, 'jobSites');
+            unsubSites = onSnapshot(sitesRef, (snapshot) => {
+                jobSites = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+                renderSites();
+            }, (error) => { console.error("Sites Sync Error:", error); updateSyncStatus('error'); });
+        }
+
+        // ==========================================
+        // UI制御関数群
+        // ==========================================
+        function switchView(viewName) {
+            const listEl = document.getElementById('view-list'); const calEl = document.getElementById('view-calendar'); const sitesEl = document.getElementById('view-sites');
+            const btnList = document.getElementById('btn-view-list'); const btnCal = document.getElementById('btn-view-calendar'); const btnSites = document.getElementById('btn-view-sites');
+
+            [listEl, calEl, sitesEl].forEach(el => el.classList.add('hidden'));
+            [btnList, btnCal, btnSites].forEach(btn => { btn.classList.remove('bg-white', 'text-blue-600', 'shadow-sm'); btn.classList.add('text-slate-500'); });
+
+            if (viewName === 'list') {
+                listEl.classList.remove('hidden'); btnList.classList.add('bg-white', 'text-blue-600', 'shadow-sm'); btnList.classList.remove('text-slate-500');
+            } else if (viewName === 'calendar') {
+                calEl.classList.remove('hidden'); btnCal.classList.add('bg-white', 'text-blue-600', 'shadow-sm'); btnCal.classList.remove('text-slate-500');
+                renderCalendar(); renderDayDetail();
+            } else if (viewName === 'sites') {
+                sitesEl.classList.remove('hidden'); btnSites.classList.add('bg-white', 'text-blue-600', 'shadow-sm'); btnSites.classList.remove('text-slate-500');
+            }
+        }
+
+        function updateFilterOptions() {
+            const select = document.getElementById('filter-status'); const currentVal = select.value;
+            const statuses = new Set(); applications.forEach(app => { if (app.status) statuses.add(app.status); });
+            const optionsHtml = ['<option value="">すべての進捗</option>'];
+            Array.from(statuses).sort().forEach(st => { optionsHtml.push(`<option value="${escapeHtml(st)}">${escapeHtml(st)}</option>`); });
+            select.innerHTML = optionsHtml.join('');
+            if(Array.from(statuses).includes(currentVal)) select.value = currentVal;
+        }
+
+        function applyFilter() { renderList(); }
+
+        function renderList() {
+            const grid = document.getElementById('company-grid'); const emptyState = document.getElementById('empty-state');
+            grid.innerHTML = '';
+            const searchText = document.getElementById('filter-text').value.toLowerCase();
+            const filterStatus = document.getElementById('filter-status').value;
+
+            let filteredApps = applications.filter(app => {
+                const matchText = (app.name && app.name.toLowerCase().includes(searchText)) || (app.industry && app.industry.toLowerCase().includes(searchText)) || (app.course && app.course.toLowerCase().includes(searchText));
+                const matchStatus = filterStatus === '' || app.status === filterStatus;
+                return matchText && matchStatus;
+            });
+
+            filteredApps.sort((a, b) => {
+                const dateA = getNextEventDate(a); const dateB = getNextEventDate(b);
+                if (dateA && !dateB) return -1; if (!dateA && dateB) return 1;
+                if (dateA && dateB) return new Date(dateA) - new Date(dateB);
+                return (b.updatedAt || 0) - (a.updatedAt || 0);
+            });
+
+            if (filteredApps.length === 0) { emptyState.classList.remove('hidden'); emptyState.classList.add('flex'); } 
+            else { emptyState.classList.add('hidden'); emptyState.classList.remove('flex'); filteredApps.forEach(app => { grid.appendChild(createCompanyCard(app)); }); }
+        }
+
+        function createCompanyCard(app) {
+            const card = document.createElement('div'); const nextEvent = getNextEvent(app); let dateBadge = '';
+            if (nextEvent) {
+                const today = new Date().toISOString().split('T')[0]; const isUrgent = nextEvent.startDate <= today;
+                const style = isUrgent ? 'text-red-600 bg-red-50 border border-red-200' : 'text-slate-600 bg-slate-50 border border-slate-200';
+                let dateStr = nextEvent.startDate.replace(/-/g, '/');
+                if (nextEvent.endDate) dateStr += ` ~ ${nextEvent.endDate.slice(5).replace(/-/g, '/')}`;
+                dateBadge = `<div class="${style} text-[10px] font-bold px-2 py-1 rounded inline-flex items-center mt-2 w-full truncate"><i class="fa-regular fa-clock mr-1"></i>${dateStr} <span class="ml-1 font-normal truncate">${nextEvent.title}</span></div>`;
+            } else {
+                dateBadge = `<div class="text-slate-400 bg-slate-50 border border-slate-200 text-[10px] px-2 py-1 rounded mt-2 w-full">予定なし</div>`;
+            }
+
+            let tagsHtml = ''; if (app.industry) { const tags = app.industry.split(/,|、/).map(t => t.trim()).slice(0, 2); tagsHtml = tags.map(tag => `<span class="bg-slate-100 text-slate-500 text-[9px] px-1.5 py-0.5 rounded mr-1">${escapeHtml(tag)}</span>`).join(''); }
+            let courseHtml = ''; if (app.course) { courseHtml = `<div class="text-[10px] text-slate-500 mt-1 mb-1 truncate w-full"><i class="fa-solid fa-briefcase text-slate-400 mr-1"></i>${escapeHtml(app.course)}</div>`; }
+
+            const borderColorClass = app.color ? app.color.replace('bg-', 'border-') : 'border-slate-300';
+            let badgeClass = 'bg-slate-100 text-slate-600';
+            for (const key in STATUS_BADGE_STYLES) { if (app.status.includes(key)) { badgeClass = STATUS_BADGE_STYLES[key]; break; } }
+
+            let mypageHtml = '';
+            if (app.url || app.loginId || app.loginPass) {
+                if (app.url) mypageHtml += `<a href="${app.url}" target="_blank" onclick="event.stopPropagation()" class="text-slate-400 hover:text-blue-500 text-xs"><i class="fa-solid fa-link"></i></a>`;
+                if (app.loginId || app.loginPass) mypageHtml += `<span class="text-slate-400 text-xs" title="ログイン情報あり"><i class="fa-solid fa-key"></i></span>`;
+            } else {
+                mypageHtml = `<span class="text-red-400 text-[9px] font-bold bg-red-50 px-1.5 py-0.5 rounded border border-red-100"><i class="fa-solid fa-circle-exclamation mr-1"></i>マイページ未登録</span>`;
+            }
+
+            card.className = `company-card bg-white p-3 rounded-lg shadow-sm border border-slate-200 border-l-[6px] ${borderColorClass} cursor-pointer relative`;
+            card.onclick = () => openModal(app.id);
+            card.innerHTML = `
+                <div class="flex justify-between items-start mb-1"><h3 class="font-bold text-slate-800 text-sm leading-tight truncate flex-1" title="${escapeHtml(app.name)}">${escapeHtml(app.name)}</h3>${tagsHtml ? `<div class="flex-none ml-1">${tagsHtml}</div>` : ''}</div>
+                ${courseHtml}
+                <div class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${badgeClass} mb-1"><i class="fa-solid fa-circle text-[6px] mr-1.5 opacity-60"></i>${escapeHtml(app.status)}</div>
+                ${dateBadge}
+                <div class="flex gap-2.5 items-center mt-2 pt-2 border-t border-slate-100">${mypageHtml}${app.esContent ? `<span class="text-slate-300 text-xs" title="ESあり"><i class="fa-solid fa-file-lines"></i></span>` : ''}${app.note ? `<span class="text-slate-300 text-xs" title="メモあり"><i class="fa-regular fa-note-sticky"></i></span>` : ''}</div>
+            `;
+            return card;
+        }
+
+        function resetToToday() { currentCalendarDate = new Date(); selectedDateStr = new Date().toISOString().split('T')[0]; renderCalendar(); renderDayDetail(); }
+        function changeMonth(delta) { currentCalendarDate.setMonth(currentCalendarDate.getMonth() + delta); renderCalendar(); }
+        function selectDate(dateStr) { selectedDateStr = dateStr; renderCalendar(); renderDayDetail(); }
+
+        function renderDayDetail() {
+            const dateDisplay = document.getElementById('selected-date-display'); const weekdayDisplay = document.getElementById('selected-date-weekday'); const eventsContainer = document.getElementById('selected-day-events');
+            if(!selectedDateStr) return;
+            const date = new Date(selectedDateStr); const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+            dateDisplay.textContent = `${date.getMonth() + 1}/${date.getDate()}`; weekdayDisplay.textContent = `${weekdays[date.getDay()]}曜日`;
+
+            const eventsOnDay = [];
+            applications.forEach(app => {
+                if(app.events) {
+                    app.events.forEach(evt => {
+                        const start = new Date(evt.startDate); const end = evt.endDate ? new Date(evt.endDate) : new Date(evt.startDate); const target = new Date(selectedDateStr);
+                        if(target >= start && target <= end) eventsOnDay.push({ ...evt, appName: app.name, appId: app.id, color: app.color });
+                    });
+                }
+            });
+
+            eventsContainer.innerHTML = '';
+            if(eventsOnDay.length === 0) { eventsContainer.innerHTML = '<span class="text-slate-400">予定はありません</span>'; } 
+            else {
+                eventsOnDay.forEach(evt => {
+                    const chip = document.createElement('div'); const borderColor = evt.color ? evt.color.replace('bg-', 'border-') : 'border-slate-500';
+                    chip.className = `bg-white border border-slate-200 border-l-4 ${borderColor} text-slate-700 px-3 py-1.5 rounded shadow-sm cursor-pointer hover:shadow-md flex items-center gap-2 transition`;
+                    chip.innerHTML = `<span class="font-bold text-xs">${escapeHtml(evt.appName)}</span><span class="text-xs text-slate-500 pl-2 border-l border-slate-100">${escapeHtml(evt.title)}</span>`;
+                    chip.onclick = () => openModal(evt.appId); eventsContainer.appendChild(chip);
+                });
+            }
+        }
+
+        function renderCalendar() {
+            const year = currentCalendarDate.getFullYear(); const month = currentCalendarDate.getMonth();
+            document.getElementById('cal-month-title').textContent = `${year}年 ${month + 1}月`;
+            const firstDay = new Date(year, month, 1); const lastDay = new Date(year, month + 1, 0); const startDayOfWeek = firstDay.getDay(); const daysInMonth = lastDay.getDate();
+            const calendarBody = document.getElementById('calendar-body'); calendarBody.innerHTML = '';
+
+            const dayEventsMap = {};
+            applications.forEach(app => {
+                if(app.events) {
+                    app.events.forEach(evt => {
+                        const start = new Date(evt.startDate); const end = evt.endDate ? new Date(evt.endDate) : new Date(evt.startDate); let current = new Date(start);
+                        while (current <= end) {
+                            if (current.getFullYear() === year && current.getMonth() === month) {
+                                const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
+                                if (!dayEventsMap[dStr]) dayEventsMap[dStr] = [];
+                                if (!dayEventsMap[dStr].some(e => e.id === evt.id)) dayEventsMap[dStr].push({ ...evt, appName: app.name, appId: app.id, color: app.color });
+                            }
+                            current.setDate(current.getDate() + 1);
+                        }
+                    });
+                }
+            });
+
+            for (let i = 0; i < startDayOfWeek; i++) { const cell = document.createElement('div'); cell.className = 'calendar-cell bg-slate-50 border-r border-b border-slate-100'; calendarBody.appendChild(cell); }
+            const todayStr = new Date().toISOString().split('T')[0];
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const isToday = dateStr === todayStr; const isSelected = dateStr === selectedDateStr;
+                const cell = document.createElement('div');
+                let cellClass = 'calendar-cell border-r border-b border-slate-100 p-1 overflow-hidden relative cursor-pointer ';
+                if (isSelected) cellClass += ' selected'; else if (isToday) cellClass += ' bg-blue-50/30';
+                cell.className = cellClass; cell.onclick = () => selectDate(dateStr);
+                const dateNum = document.createElement('div');
+                dateNum.className = `text-xs mb-1 w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white font-bold' : (isSelected ? 'text-blue-600 font-bold' : 'text-slate-500')}`;
+                dateNum.textContent = d; cell.appendChild(dateNum);
+                const dotsContainer = document.createElement('div'); dotsContainer.className = 'flex flex-wrap gap-1 content-start';
+                if (dayEventsMap[dateStr]) {
+                    dayEventsMap[dateStr].forEach(evt => {
+                        const dot = document.createElement('div'); const color = evt.color || 'bg-slate-500';
+                        dot.className = `w-2.5 h-2.5 rounded-sm ${color} shadow-sm`; dot.title = `${evt.appName}: ${evt.title}`; dotsContainer.appendChild(dot);
+                    });
+                }
+                cell.appendChild(dotsContainer); calendarBody.appendChild(cell);
+            }
+        }
+
+        function renderSites() {
+            const grid = document.getElementById('site-grid'); const emptyState = document.getElementById('site-empty-state');
+            grid.innerHTML = '';
+            if (jobSites.length === 0) { emptyState.classList.remove('hidden'); emptyState.classList.add('flex'); } 
+            else {
+                emptyState.classList.add('hidden'); emptyState.classList.remove('flex');
+                const sortedSites = [...jobSites].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+                sortedSites.forEach(site => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-white p-3 rounded-lg shadow-sm border border-slate-200 cursor-pointer hover:shadow-md transition relative flex flex-col h-full';
+                    card.onclick = () => openSiteModal(site.id);
+                    let loginHtml = '';
+                    if(site.loginId || site.loginPass) {
+                        loginHtml = `<div class="mt-auto pt-2 mt-2 border-t border-slate-100"><div class="p-2 bg-slate-50 rounded text-[10px] font-mono text-slate-600 space-y-1">${site.loginId ? `<div><span class="text-slate-400 mr-1">ID:</span>${escapeHtml(site.loginId)}</div>` : ''}${site.loginPass ? `<div><span class="text-slate-400 mr-1">PW:</span>${escapeHtml(site.loginPass)}</div>` : ''}</div></div>`;
+                    } else { loginHtml = `<div class="mt-auto"></div>`; }
+                    card.innerHTML = `<div class="flex justify-between items-start mb-1"><h3 class="font-bold text-slate-800 text-sm leading-tight truncate flex-1" title="${escapeHtml(site.name)}"><i class="fa-solid fa-globe text-blue-500 mr-1.5 opacity-80"></i>${escapeHtml(site.name)}</h3><a href="${site.url}" target="_blank" onclick="event.stopPropagation()" class="text-blue-500 hover:text-blue-700 hover:bg-blue-50 w-6 h-6 rounded flex items-center justify-center transition ml-2 flex-none"><i class="fa-solid fa-arrow-up-right-from-square text-xs"></i></a></div>${site.note ? `<p class="text-xs text-slate-500 mt-1 mb-2 line-clamp-3">${escapeHtml(site.note)}</p>` : ''}${loginHtml}`;
+                    grid.appendChild(card);
+                });
+            }
+        }
+
+        function openSiteModal(id = null) {
+            const modal = document.getElementById('site-modal'); const deleteBtn = document.getElementById('site-delete-btn');
+            modal.classList.remove('hidden'); setTimeout(() => modal.classList.remove('opacity-0'), 10);
+            if (id) {
+                editingSiteId = id; const site = jobSites.find(s => s.id === id); if(!site) return;
+                document.getElementById('site-name').value = site.name || ''; document.getElementById('site-url').value = site.url || '';
+                document.getElementById('site-login-id').value = site.loginId || ''; document.getElementById('site-login-pass').value = site.loginPass || '';
+                document.getElementById('site-note').value = site.note || ''; deleteBtn.classList.remove('hidden');
+            } else {
+                editingSiteId = null; document.getElementById('site-name').value = ''; document.getElementById('site-url').value = '';
+                document.getElementById('site-login-id').value = ''; document.getElementById('site-login-pass').value = ''; document.getElementById('site-note').value = '';
+                deleteBtn.classList.add('hidden');
+            }
+        }
+
+        function closeSiteModal() { const modal = document.getElementById('site-modal'); modal.classList.add('opacity-0'); setTimeout(() => modal.classList.add('hidden'), 300); editingSiteId = null; }
+
+        async function saveSite() {
+            if (!currentUser) return;
+            const name = document.getElementById('site-name').value; const url = document.getElementById('site-url').value;
+            if (!name || !url) { alert('サイト名とURLは必須です'); return; }
+            const docId = editingSiteId || crypto.randomUUID();
+            const newData = { id: docId, name, url, loginId: document.getElementById('site-login-id').value, loginPass: document.getElementById('site-login-pass').value, note: document.getElementById('site-note').value, updatedAt: Date.now() };
+            const docRef = doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'jobSites', docId);
+            try { await setDoc(docRef, newData); closeSiteModal(); showToast('サイトを保存しました'); } catch (e) { console.error("Save Site Error:", e); showToast("保存に失敗しました", true); }
+        }
+
+        async function deleteSite() {
+            if (!editingSiteId || !currentUser) return;
+            if (confirm('このサイト情報を削除しますか？')) {
+                const docRef = doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'jobSites', editingSiteId);
+                try { await deleteDoc(docRef); closeSiteModal(); showToast('サイトを削除しました'); } catch (e) { console.error("Delete Site Error:", e); showToast("削除に失敗しました", true); }
+            }
+        }
+
+        function getFormState() {
+            return {
+                name: document.getElementById('app-name').value, industry: document.getElementById('app-industry').value, course: document.getElementById('app-course').value,
+                status: document.getElementById('app-current-step').value, url: document.getElementById('app-url').value, loginId: document.getElementById('app-login-id').value,
+                loginPass: document.getElementById('app-login-pass').value, note: document.getElementById('app-note').value, es: document.getElementById('app-es').value,
+                color: editingColor, flow: JSON.stringify(editingFlow), events: JSON.stringify(editingEvents)
+            };
+        }
+
+        function renderColorPalette() {
+            const container = document.getElementById('color-palette');
+            container.innerHTML = COMPANY_COLORS.map(color => `<div class="color-btn ${color} ${color === editingColor ? 'active' : ''} shadow-sm" onclick="selectColor('${color}')"></div>`).join('');
+        }
+
+        function selectColor(color) { editingColor = color; document.getElementById('app-color-input').value = color; renderColorPalette(); }
+
+        function openCompanySelector() {
+            const modal = document.getElementById('company-selector-modal'); const list = document.getElementById('company-selector-list'); list.innerHTML = '';
+            applications.forEach(app => {
+                const item = document.createElement('div'); item.className = 'p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 flex justify-between items-center group';
+                item.onclick = () => { closeCompanySelector(); openModal(app.id, 'schedule', selectedDateStr); };
+                item.innerHTML = `<span class="font-bold text-slate-700 group-hover:text-blue-600 transition">${escapeHtml(app.name)}</span><i class="fa-solid fa-chevron-right text-slate-300 text-xs"></i>`;
+                list.appendChild(item);
+            });
+            if(applications.length === 0) list.innerHTML = '<div class="p-4 text-center text-slate-400 text-sm">企業が登録されていません</div>';
+            modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); modal.querySelector('div').classList.remove('scale-95'); modal.querySelector('div').classList.add('scale-100'); }, 10);
+        }
+
+        function closeCompanySelector() { const modal = document.getElementById('company-selector-modal'); modal.classList.add('opacity-0'); modal.querySelector('div').classList.remove('scale-100'); modal.querySelector('div').classList.add('scale-95'); setTimeout(() => modal.classList.add('hidden'), 200); }
+
+        function openModal(appId = null, initialTab = 'basic', initialDate = null) {
+            const modal = document.getElementById('modal'); const form = document.getElementById('app-form'); const deleteBtn = document.getElementById('delete-btn');
+            modal.classList.remove('hidden'); setTimeout(() => modal.classList.remove('opacity-0'), 10);
+            switchModalTab(initialTab);
+            if (appId) {
+                editingAppId = appId; const app = applications.find(a => a.id === appId); if(!app) return;
+                document.getElementById('app-id').value = app.id; document.getElementById('app-name').value = app.name; document.getElementById('app-industry').value = app.industry || ''; document.getElementById('app-course').value = app.course || ''; document.getElementById('app-url').value = app.url || ''; document.getElementById('app-login-id').value = app.loginId || ''; document.getElementById('app-login-pass').value = app.loginPass || ''; document.getElementById('app-note').value = app.note || ''; document.getElementById('app-es').value = app.esContent || ''; document.getElementById('app-current-step').value = app.status;
+                editingFlow = [...(app.flowSteps || DEFAULT_FLOW)]; editingEvents = app.events ? JSON.parse(JSON.stringify(app.events)) : []; editingColor = app.color || 'bg-slate-500';
+                deleteBtn.classList.remove('hidden');
+            } else {
+                editingAppId = null; form.reset(); editingFlow = [...DEFAULT_FLOW]; editingEvents = []; editingColor = 'bg-slate-500'; deleteBtn.classList.add('hidden');
+            }
+            renderFlowList(); renderStatusSelect();
+            if (appId) { const app = applications.find(a => a.id === appId); const select = document.getElementById('app-current-step'); if(editingFlow.includes(app.status)) select.value = app.status; }
+            renderEventList(); renderColorPalette(); 
+            if (initialDate && initialTab === 'schedule') document.getElementById('event-date-start').value = initialDate;
+            setTimeout(() => { initialFormState = getFormState(); }, 50);
+        }
+
+        function showUnsavedWarning() { const modal = document.getElementById('unsaved-warning-modal'); modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); modal.querySelector('div').classList.remove('scale-95'); modal.querySelector('div').classList.add('scale-100'); }, 10); }
+        function hideUnsavedWarning() { const modal = document.getElementById('unsaved-warning-modal'); modal.classList.add('opacity-0'); modal.querySelector('div').classList.remove('scale-100'); modal.querySelector('div').classList.add('scale-95'); setTimeout(() => modal.classList.add('hidden'), 200); }
+        function forceCloseModal() { hideUnsavedWarning(); const modal = document.getElementById('modal'); modal.classList.add('opacity-0'); setTimeout(() => modal.classList.add('hidden'), 300); editingAppId = null; initialFormState = null; }
+        function closeModal(checkUnsaved = true) { if (checkUnsaved && initialFormState) { const currentState = getFormState(); if (JSON.stringify(initialFormState) !== JSON.stringify(currentState)) { showUnsavedWarning(); return; } } forceCloseModal(); }
+        function switchModalTab(tabName) {
+            ['basic', 'flow', 'schedule'].forEach(t => { document.getElementById(`tab-${t}`).classList.add('hidden'); document.getElementById(`tab-btn-${t}`).classList.remove('text-blue-600', 'border-b-2', 'border-blue-600'); document.getElementById(`tab-btn-${t}`).classList.add('text-slate-500'); });
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden'); document.getElementById(`tab-btn-${tabName}`).classList.add('text-blue-600', 'border-b-2', 'border-blue-600'); document.getElementById(`tab-btn-${tabName}`).classList.remove('text-slate-500');
+        }
+
+        function addFlowStep(stepName) { if (!stepName) return; editingFlow.push(stepName); document.getElementById('custom-step-name').value = ''; renderFlowList(); renderStatusSelect(); }
+        function removeFlowStep(index) { editingFlow.splice(index, 1); renderFlowList(); renderStatusSelect(); }
+        function moveFlowStep(index, direction) { if (direction === -1 && index > 0) { [editingFlow[index], editingFlow[index-1]] = [editingFlow[index-1], editingFlow[index]]; } else if (direction === 1 && index < editingFlow.length - 1) { [editingFlow[index], editingFlow[index+1]] = [editingFlow[index+1], editingFlow[index]]; } renderFlowList(); renderStatusSelect(); }
+        function renderFlowList() { const list = document.getElementById('flow-list'); list.innerHTML = editingFlow.map((step, i) => `<li class="flex items-center justify-between bg-white border border-slate-200 p-2 rounded text-sm"><span class="font-bold text-slate-700"><span class="text-slate-300 mr-2 text-xs">${i+1}.</span>${escapeHtml(step)}</span><div class="flex gap-1"><button type="button" onclick="moveFlowStep(${i}, -1)" class="px-1.5 py-0.5 text-slate-400 hover:text-blue-600"><i class="fa-solid fa-arrow-up"></i></button><button type="button" onclick="moveFlowStep(${i}, 1)" class="px-1.5 py-0.5 text-slate-400 hover:text-blue-600"><i class="fa-solid fa-arrow-down"></i></button><button type="button" onclick="removeFlowStep(${i})" class="px-1.5 py-0.5 text-slate-400 hover:text-red-500 ml-1"><i class="fa-solid fa-times"></i></button></div></li>`).join(''); }
+        function renderStatusSelect() { const select = document.getElementById('app-current-step'); const currentVal = select.value; select.innerHTML = editingFlow.map(step => `<option value="${step}">${step}</option>`).join(''); if (editingFlow.includes(currentVal)) select.value = currentVal; }
+
+        function addEvent() {
+            const start = document.getElementById('event-date-start').value; const end = document.getElementById('event-date-end').value; const title = document.getElementById('event-title').value;
+            if (!start || !title) return; editingEvents.push({ id: crypto.randomUUID(), startDate: start, endDate: end || null, title }); editingEvents.sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+            document.getElementById('event-title').value = ''; document.getElementById('event-date-start').value = ''; document.getElementById('event-date-end').value = ''; renderEventList();
+        }
+        function removeEvent(id) { editingEvents = editingEvents.filter(e => e.id !== id); renderEventList(); }
+        function renderEventList() { const list = document.getElementById('event-list'); list.innerHTML = editingEvents.map(evt => { let dateStr = evt.startDate; if (evt.endDate) dateStr += ` ~ ${evt.endDate}`; return `<li class="flex items-center justify-between bg-white border border-slate-200 p-2 rounded text-sm"><div class="flex flex-col sm:flex-row sm:items-center sm:gap-2"><span class="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 whitespace-nowrap mb-1 sm:mb-0">${dateStr}</span><span class="font-bold text-slate-700">${escapeHtml(evt.title)}</span></div><button type="button" onclick="removeEvent('${evt.id}')" class="text-slate-400 hover:text-red-500 px-2 ml-2"><i class="fa-solid fa-times"></i></button></li>`; }).join(''); }
+
+        async function saveApplication(event) {
+            if(event) event.preventDefault(); if(!currentUser) return;
+            const name = document.getElementById('app-name').value; if (!name) { alert('企業名は必須です'); return; }
+            const docId = editingAppId || crypto.randomUUID();
+            const newData = { id: docId, name, industry: document.getElementById('app-industry').value, course: document.getElementById('app-course').value, status: document.getElementById('app-current-step').value, url: document.getElementById('app-url').value, loginId: document.getElementById('app-login-id').value, loginPass: document.getElementById('app-login-pass').value, note: document.getElementById('app-note').value, esContent: document.getElementById('app-es').value, flowSteps: editingFlow, events: editingEvents, color: editingColor, updatedAt: Date.now() };
+            const docRef = doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'applications', docId);
+            try { await setDoc(docRef, newData); closeModal(false); showToast('保存しました'); } catch (e) { console.error("Save Application Error:", e); showToast('保存に失敗しました', true); }
+        }
+
+        async function deleteApplication() {
+            if (!editingAppId || !currentUser) return;
+            if (confirm('この企業情報を削除しますか？')) {
+                const docRef = doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'applications', editingAppId);
+                try { await deleteDoc(docRef); closeModal(false); showToast('削除しました'); } catch (e) { console.error("Delete Application Error:", e); showToast('削除に失敗しました', true); }
+            }
+        }
+
+        function getNextEvent(app) { if (!app.events || app.events.length === 0) return null; const today = new Date().toISOString().split('T')[0]; return app.events.find(e => { const checkDate = e.endDate || e.startDate; return checkDate >= today; }) || null; }
+        function getNextEventDate(app) { const evt = getNextEvent(app); return evt ? evt.startDate : null; }
+        function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m])); }
+        function showToast(msg, isError = false) { const t = document.getElementById('toast'); const icon = t.querySelector('i'); document.getElementById('toast-message').textContent = msg; if (isError) { icon.className = 'fa-solid fa-circle-exclamation text-red-400'; } else { icon.className = 'fa-solid fa-check-circle text-green-400'; } t.classList.remove('translate-y-20', 'opacity-0'); setTimeout(() => t.classList.add('translate-y-20', 'opacity-0'), 2500); }
+
+        function exportData() {
+            const exportObj = { applications: applications, jobSites: jobSites };
+            const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `job_hunt_backup_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); showToast('バックアップをダウンロードしました');
+        }
+
+        async function importData(input) {
+            const file = input.files[0]; if (!file || !currentUser) return;
+            const reader = new FileReader();
+            reader.onload = async e => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (confirm('ファイル内のデータをクラウドにマージ（上書き）しますか？\n※既存の同IDデータは上書きされます。')) {
+                        let importApps = []; let importSites = [];
+                        if (Array.isArray(data)) { importApps = data; } else { if (data.applications) importApps = data.applications; if (data.jobSites) importSites = data.jobSites; }
+                        const promises = [];
+                        importApps.forEach(appData => { const docId = appData.id || crypto.randomUUID(); const docRef = doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'applications', docId); promises.push(setDoc(docRef, { ...appData, id: docId })); });
+                        importSites.forEach(siteData => { const docId = siteData.id || crypto.randomUUID(); const docRef = doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'jobSites', docId); promises.push(setDoc(docRef, { ...siteData, id: docId })); });
+                        await Promise.all(promises); showToast('データをクラウドに復元しました');
+                    }
+                } catch(err) { console.error("Import Error:", err); alert('読み込みエラーが発生しました'); }
+                input.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        // Window Object Bindings
+        window.switchView = switchView; window.exportData = exportData; window.importData = importData; window.applyFilter = applyFilter; window.changeMonth = changeMonth; window.resetToToday = resetToToday; window.openCompanySelector = openCompanySelector; window.closeCompanySelector = closeCompanySelector; window.openModal = openModal; window.closeModal = closeModal; window.hideUnsavedWarning = hideUnsavedWarning; window.forceCloseModal = forceCloseModal; window.switchModalTab = switchModalTab; window.addFlowStep = addFlowStep; window.removeFlowStep = removeFlowStep; window.moveFlowStep = moveFlowStep; window.addEvent = addEvent; window.removeEvent = removeEvent; window.saveApplication = saveApplication; window.deleteApplication = deleteApplication; window.selectColor = selectColor; window.openSiteModal = openSiteModal; window.closeSiteModal = closeSiteModal; window.saveSite = saveSite; window.deleteSite = deleteSite; window.loginWithGoogle = loginWithGoogle; window.logout = logout;
+
+    </script>
+</body>
+</html>
