@@ -73,6 +73,7 @@
                     <div id="sync-status" class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-400 rounded-full border border-white" title="同期準備中..."></div>
                 </div>
                 <h1 class="text-base font-bold text-slate-800 tracking-tight">就活管理</h1>
+                <span id="user-info" class="hidden text-[10px] sm:text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded truncate max-w-[100px] sm:max-w-[200px]" title="ログイン中のアカウント"></span>
             </div>
             
             <div class="flex items-center gap-2 sm:gap-3">
@@ -476,8 +477,13 @@
 
         onAuthStateChanged(auth, async (user) => {
             const overlay = document.getElementById('login-overlay');
+            const userInfoEl = document.getElementById('user-info');
             if (user) {
                 currentUser = user;
+                if (userInfoEl) {
+                    userInfoEl.textContent = user.email || 'ログイン済み';
+                    userInfoEl.classList.remove('hidden');
+                }
                 overlay.classList.add('opacity-0');
                 setTimeout(() => overlay.classList.add('hidden'), 300);
                 
@@ -486,6 +492,10 @@
                 updateSyncStatus('success');
             } else {
                 currentUser = null;
+                if (userInfoEl) {
+                    userInfoEl.textContent = '';
+                    userInfoEl.classList.add('hidden');
+                }
                 overlay.classList.remove('hidden');
                 setTimeout(() => overlay.classList.remove('opacity-0'), 10);
 
