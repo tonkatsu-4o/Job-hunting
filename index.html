@@ -44,6 +44,9 @@
         .color-btn { width: 2rem; height: 2rem; border-radius: 9999px; cursor: pointer; border: 2px solid transparent; transition: transform 0.1s; }
         .color-btn:hover { transform: scale(1.1); }
         .color-btn.active { border-color: #334155; box-shadow: 0 0 0 2px white, 0 0 0 4px #334155; }
+        
+        /* iPhoneなどの下部セーフエリア考慮 */
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
     </style>
 </head>
 <body class="text-slate-800 h-screen flex flex-col overflow-hidden text-sm sm:text-base">
@@ -63,68 +66,108 @@
         </div>
     </div>
 
-    <!-- ヘッダー -->
-    <header class="bg-white border-b border-slate-200 shadow-sm z-30 flex-none">
-        <div class="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="bg-blue-600 text-white p-1 rounded-md relative">
-                    <i class="fa-solid fa-briefcase text-sm"></i>
+    <!-- ヘッダー (スマホ対応でレイアウト整理) -->
+    <header class="bg-white border-b border-slate-200 shadow-sm z-30 flex-none h-14 relative">
+        <div class="max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
+            <!-- 左側: ロゴとアカウント情報 -->
+            <div class="flex items-center gap-2 sm:gap-3">
+                <div class="bg-blue-600 text-white p-1.5 rounded-md relative flex items-center justify-center">
+                    <i class="fa-solid fa-briefcase text-xs sm:text-sm"></i>
                     <!-- クラウド同期状態インジケーター -->
                     <div id="sync-status" class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-400 rounded-full border border-white" title="同期準備中..."></div>
                 </div>
-                <h1 class="text-base font-bold text-slate-800 tracking-tight">就活管理</h1>
-                <span id="user-info" class="hidden text-[10px] sm:text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded truncate max-w-[100px] sm:max-w-[200px]" title="ログイン中のアカウント"></span>
+                <h1 class="text-base font-bold text-slate-800 tracking-tight hidden sm:block">就活管理</h1>
+                <span id="user-info" class="hidden text-[10px] sm:text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded truncate max-w-[120px] sm:max-w-[200px]" title="ログイン中のアカウント"></span>
             </div>
             
-            <div class="flex items-center gap-2 sm:gap-3">
-                <div class="flex bg-slate-100 p-1 rounded-lg">
-                    <button onclick="switchView('list')" id="btn-view-list" class="px-3 py-1 text-xs font-bold rounded-md transition shadow-sm bg-white text-blue-600" title="企業リスト">
-                        <i class="fa-solid fa-list mr-1"></i>
-                    </button>
-                    <button onclick="switchView('calendar')" id="btn-view-calendar" class="px-3 py-1 text-xs font-bold rounded-md transition text-slate-500 hover:text-slate-700" title="カレンダー">
-                        <i class="fa-regular fa-calendar mr-1"></i>
-                    </button>
-                    <button onclick="switchView('sites')" id="btn-view-sites" class="px-3 py-1 text-xs font-bold rounded-md transition text-slate-500 hover:text-slate-700" title="就活サイト管理">
-                        <i class="fa-solid fa-bookmark mr-1"></i>
-                    </button>
-                </div>
+            <!-- 中央: タブ (PC画面でのみ表示) -->
+            <div class="hidden sm:flex bg-slate-100 p-1 rounded-lg">
+                <button onclick="switchView('list')" id="btn-view-list-pc" class="px-3 py-1 text-xs font-bold rounded-md transition shadow-sm bg-white text-blue-600" title="企業リスト">
+                    <i class="fa-solid fa-list mr-1"></i>企業一覧
+                </button>
+                <button onclick="switchView('calendar')" id="btn-view-calendar-pc" class="px-3 py-1 text-xs font-bold rounded-md transition text-slate-500 hover:text-slate-700" title="カレンダー">
+                    <i class="fa-regular fa-calendar mr-1"></i>カレンダー
+                </button>
+                <button onclick="switchView('sites')" id="btn-view-sites-pc" class="px-3 py-1 text-xs font-bold rounded-md transition text-slate-500 hover:text-slate-700" title="就活サイト管理">
+                    <i class="fa-solid fa-bookmark mr-1"></i>サイト管理
+                </button>
+            </div>
 
-                <div class="hidden sm:flex items-center gap-2 border-l border-slate-200 pl-3 ml-1">
-                    <button onclick="exportData()" class="text-slate-500 hover:text-blue-600 p-1.5 rounded transition" title="データのバックアップ(ダウンロード)">
-                        <i class="fa-solid fa-download"></i>
-                    </button>
-                </div>
-
-                <!-- ログアウトボタン -->
-                <button onclick="logout()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded transition ml-1" title="ログアウト">
-                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            <!-- 右側: アクションメニュー -->
+            <div class="flex items-center gap-1.5 sm:gap-2">
+                <!-- 企業追加ボタン -->
+                <button onclick="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow transition flex items-center gap-1.5 whitespace-nowrap">
+                    <i class="fa-solid fa-plus"></i><span class="hidden sm:inline">企業追加</span>
                 </button>
 
-                <!-- 追加ボタン -->
-                <button onclick="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow transition flex items-center gap-1.5 ml-1 whitespace-nowrap">
-                    <i class="fa-solid fa-plus"></i>
-                    <span class="hidden sm:inline">企業追加</span>
-                </button>
+                <!-- ドロップダウンメニュー (バックアップ・ログアウト等) -->
+                <div class="relative" id="menu-container">
+                    <button onclick="toggleMenu()" class="text-slate-500 hover:bg-slate-100 hover:text-slate-700 w-8 h-8 rounded-lg transition flex items-center justify-center">
+                        <i class="fa-solid fa-ellipsis-vertical"></i>
+                    </button>
+                    <!-- メニュー本体 -->
+                    <div id="dropdown-menu" class="hidden absolute right-0 mt-1 w-44 bg-white rounded-lg shadow-xl border border-slate-100 py-1.5 z-50">
+                        <button onclick="exportData(); toggleMenu();" class="w-full text-left px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 flex items-center gap-2">
+                            <i class="fa-solid fa-download w-4 text-center"></i> バックアップを保存
+                        </button>
+                        <label class="w-full text-left px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 flex items-center gap-2 cursor-pointer">
+                            <i class="fa-solid fa-upload w-4 text-center"></i> データを復元
+                            <input type="file" class="hidden" accept=".json" onchange="importData(this); toggleMenu();">
+                        </label>
+                        <div class="border-t border-slate-100 my-1"></div>
+                        <button onclick="logout(); toggleMenu();" class="w-full text-left px-4 py-2 text-xs font-medium text-red-600 hover:bg-red-50 flex items-center gap-2">
+                            <i class="fa-solid fa-arrow-right-from-bracket w-4 text-center"></i> ログアウト
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </header>
 
-    <!-- メインコンテンツ -->
-    <main class="flex-1 overflow-hidden relative bg-slate-50">
+    <!-- スマホ用 ボトムナビゲーション (画面幅が狭い時のみ表示) -->
+    <nav class="sm:hidden fixed bottom-0 w-full bg-white border-t border-slate-200 flex justify-around items-center h-14 z-40 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <button onclick="switchView('list')" id="btn-view-list-sp" class="flex flex-col items-center justify-center w-full h-full text-blue-600 transition-colors">
+            <i class="fa-solid fa-list text-lg mb-0.5"></i>
+            <span class="text-[9px] font-bold">リスト</span>
+        </button>
+        <button onclick="switchView('calendar')" id="btn-view-calendar-sp" class="flex flex-col items-center justify-center w-full h-full text-slate-400 hover:text-slate-600 transition-colors">
+            <i class="fa-regular fa-calendar text-lg mb-0.5"></i>
+            <span class="text-[9px] font-bold">カレンダー</span>
+        </button>
+        <button onclick="switchView('sites')" id="btn-view-sites-sp" class="flex flex-col items-center justify-center w-full h-full text-slate-400 hover:text-slate-600 transition-colors">
+            <i class="fa-solid fa-bookmark text-lg mb-0.5"></i>
+            <span class="text-[9px] font-bold">サイト</span>
+        </button>
+    </nav>
+
+    <!-- メインコンテンツ (スマホボトムバーの被りを防ぐためのパディング pb-14) -->
+    <main class="flex-1 overflow-hidden relative bg-slate-50 pb-14 sm:pb-0">
         
         <!-- リストビュー -->
         <div id="view-list" class="absolute inset-0 overflow-y-auto p-3 sm:p-4 custom-scroll">
+            
+            <!-- フィルタ・ソートバー -->
             <div class="max-w-7xl mx-auto mb-4 flex flex-col sm:flex-row gap-2">
                 <div class="relative flex-1">
                     <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm"></i>
                     <input type="text" id="filter-text" oninput="applyFilter()" placeholder="企業名、業界、コースで検索..." class="input-base pl-9 pr-3 py-2 rounded-lg text-sm w-full shadow-sm">
                 </div>
-                <select id="filter-status" onchange="applyFilter()" class="input-base px-3 py-2 rounded-lg text-sm bg-white cursor-pointer sm:w-48 text-slate-700 font-medium shadow-sm">
-                    <option value="">すべての進捗</option>
-                </select>
+                <div class="flex gap-2 w-full sm:w-auto">
+                    <!-- 進捗フィルタ -->
+                    <select id="filter-status" onchange="applyFilter()" class="input-base px-2 py-2 rounded-lg text-xs sm:text-sm bg-white cursor-pointer flex-1 sm:w-36 text-slate-700 font-medium shadow-sm">
+                        <option value="">すべての進捗</option>
+                        <!-- JSで生成 -->
+                    </select>
+                    <!-- ソート順 (新規追加) -->
+                    <select id="sort-order" onchange="applyFilter()" class="input-base px-2 py-2 rounded-lg text-xs sm:text-sm bg-white cursor-pointer flex-1 sm:w-48 text-slate-700 font-medium shadow-sm">
+                        <option value="next_event_asc">次回の予定が近い順</option>
+                        <option value="end_date_asc">スケジュール終了が早い順</option>
+                        <option value="updated_desc">更新日が新しい順</option>
+                    </select>
+                </div>
             </div>
 
-            <div id="company-grid" class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div id="company-grid" class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pb-10">
                 <!-- JSでカード生成 -->
             </div>
             <div id="empty-state" class="hidden flex-col items-center justify-center h-full text-slate-400 py-10">
@@ -175,7 +218,7 @@
                     <i class="fa-solid fa-plus"></i> サイト追加
                 </button>
             </div>
-            <div id="site-grid" class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div id="site-grid" class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pb-10">
             </div>
             <div id="site-empty-state" class="hidden flex-col items-center justify-center h-full text-slate-400 py-10">
                 <i class="fa-regular fa-bookmark text-4xl mb-3"></i>
@@ -184,13 +227,13 @@
         </div>
     </main>
 
-    <!-- 各種モーダル等 (既存実装と同一のため簡略化せずに記述) -->
+    <!-- 各種モーダル -->
     <!-- 企業選択モーダル (予定追加用) -->
     <div id="company-selector-modal" class="fixed inset-0 bg-slate-900/50 z-[70] hidden flex items-center justify-center p-4 backdrop-blur-sm opacity-0 transition-opacity duration-200">
         <div class="bg-white rounded-xl shadow-xl w-full max-w-sm transform scale-95 transition-transform duration-200 overflow-hidden flex flex-col max-h-[80vh]">
             <div class="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                 <h3 class="font-bold text-slate-700 text-sm">予定を追加する企業を選択</h3>
-                <button onclick="closeCompanySelector()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times"></i></button>
+                <button onclick="closeCompanySelector()" class="text-slate-400 hover:text-slate-600 w-8 h-8 rounded-full hover:bg-slate-200 transition flex items-center justify-center"><i class="fa-solid fa-times"></i></button>
             </div>
             <div class="p-2 overflow-y-auto custom-scroll flex-1">
                 <div id="company-selector-list" class="space-y-1"></div>
@@ -238,9 +281,10 @@
                 <form id="app-form" onsubmit="saveApplication(event)" class="h-full flex flex-col">
                     <input type="hidden" id="app-id">
                     <input type="hidden" id="app-color-input" value="bg-slate-500">
+                    <input type="hidden" id="app-is-pinned" value="false"> <!-- ピン留め状態保持用 -->
 
                     <!-- 基本情報タブ -->
-                    <div id="tab-basic" class="tab-content flex-1 overflow-y-auto p-4 space-y-5 custom-scroll">
+                    <div id="tab-basic" class="tab-content flex-1 overflow-y-auto p-4 space-y-5 custom-scroll pb-10">
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div class="sm:col-span-2">
                                 <label class="block text-xs font-bold text-slate-500 mb-1">企業名 <span class="text-red-500">*</span></label>
@@ -250,10 +294,16 @@
                                 <label class="block text-xs font-bold text-slate-500 mb-2">テーマカラー</label>
                                 <div id="color-palette" class="flex flex-wrap gap-2"></div>
                             </div>
+                            
+                            <!-- 業界タグ入力 (サジェスト付き) -->
                             <div>
                                 <label class="block text-xs font-bold text-slate-500 mb-1">業界タグ</label>
-                                <input type="text" id="app-industry" class="input-base px-3 py-2 rounded text-sm" placeholder="IT, メーカー">
+                                <input type="text" id="app-industry" list="industry-list" class="input-base px-3 py-2 rounded text-sm" placeholder="IT, メーカー">
+                                <datalist id="industry-list">
+                                    <!-- JSで登録済みの業界を自動生成 -->
+                                </datalist>
                             </div>
+                            
                             <div>
                                 <label class="block text-xs font-bold text-slate-500 mb-1">志望コース・部門</label>
                                 <input type="text" id="app-course" class="input-base px-3 py-2 rounded text-sm" placeholder="総合職, SE, 開発部など">
@@ -290,7 +340,7 @@
                     </div>
 
                     <!-- 採用フロータブ -->
-                    <div id="tab-flow" class="tab-content hidden flex-1 overflow-y-auto p-4 custom-scroll bg-slate-50">
+                    <div id="tab-flow" class="tab-content hidden flex-1 overflow-y-auto p-4 custom-scroll bg-slate-50 pb-10">
                         <div class="bg-white p-4 rounded border border-slate-200 shadow-sm mb-4">
                             <label class="block text-xs font-bold text-slate-500 mb-2">ステップを追加</label>
                             <div class="flex gap-2 mb-3 flex-wrap">
@@ -315,7 +365,7 @@
                     </div>
 
                     <!-- スケジュールタブ -->
-                    <div id="tab-schedule" class="tab-content hidden flex-1 overflow-y-auto p-4 custom-scroll bg-slate-50">
+                    <div id="tab-schedule" class="tab-content hidden flex-1 overflow-y-auto p-4 custom-scroll bg-slate-50 pb-10">
                         <div class="bg-white p-4 rounded border border-slate-200 shadow-sm mb-4 w-full overflow-hidden">
                             <label class="block text-xs font-bold text-slate-500 mb-2">カレンダーに予定を追加</label>
                             <div class="space-y-3 mb-3">
@@ -411,17 +461,19 @@
         <span id="toast-message" class="font-medium text-sm">完了しました</span>
     </div>
 
-    <!-- Firebase SDK (ES Modules) -->
+    <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
         // ==========================================
         // Firebase 設定
+        // 【重要】ご自身のサーバーで公開する際は、以下の値をコンソールの値に書き換えてください。
+        // ※このプレビュー環境では、自動注入される変数(__firebase_config)をフォールバックとして利用します。
         // ==========================================
-        const firebaseConfig = {
-            apiKey: "AIzaSyCUaM5fWkL7bzQe7LErrCSbY36oTd3a6CI",
+        const myConfig = {
+            apiKey: "6bdEmm2XhKVA2nTsCdDFmn7R4rr1",
             authDomain: "job-9b8a1.firebaseapp.com",
             projectId: "job-9b8a1",
             storageBucket: "job-9b8a1.firebasestorage.app",
@@ -429,14 +481,14 @@
             appId: "1:851672541313:web:e5c1fe1245977b4eae4580",
             measurementId: "G-9HV6101BSC"
         };
+        const envConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const firebaseConfig = envConfig || myConfig;
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const provider = new GoogleAuthProvider();
-        
-        // Canvasのルール制約に基づく統一AppID (変更不要)
-        const APP_ID = "job_tracker_v1"; 
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : "job_tracker_v1";
 
         // ==========================================
         // 定数・State
@@ -460,19 +512,54 @@
         let currentUser = null; let unsubApps = null; let unsubSites = null;
 
         // ==========================================
+        // UI ドロップダウンメニュー制御
+        // ==========================================
+        function toggleMenu() {
+            const menu = document.getElementById('dropdown-menu');
+            if (menu.classList.contains('hidden')) {
+                menu.classList.remove('hidden');
+            } else {
+                menu.classList.add('hidden');
+            }
+        }
+        // 画面外クリックでメニューを閉じる
+        document.addEventListener('click', (e) => {
+            const container = document.getElementById('menu-container');
+            const menu = document.getElementById('dropdown-menu');
+            if (container && !container.contains(e.target) && menu && !menu.classList.contains('hidden')) {
+                menu.classList.add('hidden');
+            }
+        });
+
+        // ==========================================
         // 認証と初期化ロジック
         // ==========================================
-        function loginWithGoogle() {
-            signInWithPopup(auth, provider).catch(error => {
-                console.error("Login Error:", error);
-                alert("ログインに失敗しました: " + error.message + "\n※Firebaseコンソールで対象ドメインが「承認済みドメイン」に追加されているか確認してください。");
-            });
+        async function loginWithGoogle() {
+            // ※プレビュー環境(Canvas)ではGoogle OAuthが制限されているため、カスタムトークンで代替します
+            if (envConfig && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                try {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } catch(e) {
+                    await signInAnonymously(auth);
+                }
+            } else {
+                // 本番環境用
+                signInWithPopup(auth, provider).catch(error => {
+                    console.error("Login Error:", error);
+                    alert("ログインに失敗しました: " + error.message + "\n※Firebaseコンソールで対象ドメインが「承認済みドメイン」に追加されているか確認してください。");
+                });
+            }
         }
 
         function logout() {
             if(confirm("ログアウトしますか？")) {
                 signOut(auth);
             }
+        }
+
+        // 初期自動ログイン試行 (プレビュー環境用)
+        if (envConfig) {
+            loginWithGoogle();
         }
 
         onAuthStateChanged(auth, async (user) => {
@@ -502,7 +589,7 @@
                 if (unsubApps) unsubApps();
                 if (unsubSites) unsubSites();
                 applications = []; jobSites = [];
-                updateFilterOptions(); renderList(); renderCalendar(); renderDayDetail(); renderSites();
+                updateFilterOptions(); updateIndustrySuggestions(); renderList(); renderCalendar(); renderDayDetail(); renderSites();
                 updateSyncStatus('error');
             }
         });
@@ -571,11 +658,12 @@
                     if (!app.color) app.color = 'bg-slate-500';
                     if (!app.esContent) app.esContent = ''; 
                     if (!app.course) app.course = ''; 
+                    if (app.isPinned === undefined) app.isPinned = false; // ピン留めプロパティ初期化
                     if (app.color.includes('-100')) app.color = app.color.replace('-100', '-500');
                     app.events.forEach(evt => { if (evt.date && !evt.startDate) { evt.startDate = evt.date; delete evt.date; } });
                     if (app.status && !app.flowSteps.includes(app.status)) app.flowSteps.unshift(app.status);
                 });
-                updateFilterOptions(); renderList(); renderCalendar(); renderDayDetail();
+                updateFilterOptions(); updateIndustrySuggestions(); renderList(); renderCalendar(); renderDayDetail();
             }, (error) => { console.error("Apps Sync Error:", error); updateSyncStatus('error'); });
 
             const sitesRef = collection(db, 'artifacts', APP_ID, 'users', userId, 'jobSites');
@@ -590,19 +678,43 @@
         // ==========================================
         function switchView(viewName) {
             const listEl = document.getElementById('view-list'); const calEl = document.getElementById('view-calendar'); const sitesEl = document.getElementById('view-sites');
-            const btnList = document.getElementById('btn-view-list'); const btnCal = document.getElementById('btn-view-calendar'); const btnSites = document.getElementById('btn-view-sites');
+            const btnListPC = document.getElementById('btn-view-list-pc'); const btnCalPC = document.getElementById('btn-view-calendar-pc'); const btnSitesPC = document.getElementById('btn-view-sites-pc');
+            const btnListSP = document.getElementById('btn-view-list-sp'); const btnCalSP = document.getElementById('btn-view-calendar-sp'); const btnSitesSP = document.getElementById('btn-view-sites-sp');
 
+            // すべて隠す & 非アクティブ化
             [listEl, calEl, sitesEl].forEach(el => el.classList.add('hidden'));
-            [btnList, btnCal, btnSites].forEach(btn => { btn.classList.remove('bg-white', 'text-blue-600', 'shadow-sm'); btn.classList.add('text-slate-500'); });
+            [btnListPC, btnCalPC, btnSitesPC].forEach(btn => { btn.classList.remove('bg-white', 'text-blue-600', 'shadow-sm'); btn.classList.add('text-slate-500'); });
+            [btnListSP, btnCalSP, btnSitesSP].forEach(btn => { btn.classList.remove('text-blue-600'); btn.classList.add('text-slate-400'); });
 
             if (viewName === 'list') {
-                listEl.classList.remove('hidden'); btnList.classList.add('bg-white', 'text-blue-600', 'shadow-sm'); btnList.classList.remove('text-slate-500');
+                listEl.classList.remove('hidden'); 
+                btnListPC.classList.add('bg-white', 'text-blue-600', 'shadow-sm'); btnListPC.classList.remove('text-slate-500');
+                btnListSP.classList.add('text-blue-600'); btnListSP.classList.remove('text-slate-400');
             } else if (viewName === 'calendar') {
-                calEl.classList.remove('hidden'); btnCal.classList.add('bg-white', 'text-blue-600', 'shadow-sm'); btnCal.classList.remove('text-slate-500');
+                calEl.classList.remove('hidden'); 
+                btnCalPC.classList.add('bg-white', 'text-blue-600', 'shadow-sm'); btnCalPC.classList.remove('text-slate-500');
+                btnCalSP.classList.add('text-blue-600'); btnCalSP.classList.remove('text-slate-400');
                 renderCalendar(); renderDayDetail();
             } else if (viewName === 'sites') {
-                sitesEl.classList.remove('hidden'); btnSites.classList.add('bg-white', 'text-blue-600', 'shadow-sm'); btnSites.classList.remove('text-slate-500');
+                sitesEl.classList.remove('hidden'); 
+                btnSitesPC.classList.add('bg-white', 'text-blue-600', 'shadow-sm'); btnSitesPC.classList.remove('text-slate-500');
+                btnSitesSP.classList.add('text-blue-600'); btnSitesSP.classList.remove('text-slate-400');
             }
+        }
+
+        // 業界サジェスト（datalist）の更新
+        function updateIndustrySuggestions() {
+            const list = document.getElementById('industry-list');
+            const industries = new Set();
+            applications.forEach(app => {
+                if (app.industry) {
+                    app.industry.split(/[,、]/).forEach(i => {
+                        const trimmed = i.trim();
+                        if (trimmed) industries.add(trimmed);
+                    });
+                }
+            });
+            list.innerHTML = Array.from(industries).sort().map(ind => `<option value="${escapeHtml(ind)}">`).join('');
         }
 
         function updateFilterOptions() {
@@ -616,11 +728,23 @@
 
         function applyFilter() { renderList(); }
 
+        // スケジュール終了日の最も遅い日付を取得
+        function getFinalEndDate(app) {
+            if (!app.events || app.events.length === 0) return null;
+            let maxDate = '';
+            app.events.forEach(e => {
+                const d = e.endDate || e.startDate;
+                if (!maxDate || d > maxDate) maxDate = d;
+            });
+            return maxDate;
+        }
+
         function renderList() {
             const grid = document.getElementById('company-grid'); const emptyState = document.getElementById('empty-state');
             grid.innerHTML = '';
             const searchText = document.getElementById('filter-text').value.toLowerCase();
             const filterStatus = document.getElementById('filter-status').value;
+            const sortOrder = document.getElementById('sort-order').value;
 
             let filteredApps = applications.filter(app => {
                 const matchText = (app.name && app.name.toLowerCase().includes(searchText)) || (app.industry && app.industry.toLowerCase().includes(searchText)) || (app.course && app.course.toLowerCase().includes(searchText));
@@ -628,15 +752,49 @@
                 return matchText && matchStatus;
             });
 
+            // ソートロジック
             filteredApps.sort((a, b) => {
-                const dateA = getNextEventDate(a); const dateB = getNextEventDate(b);
-                if (dateA && !dateB) return -1; if (!dateA && dateB) return 1;
-                if (dateA && dateB) return new Date(dateA) - new Date(dateB);
-                return (b.updatedAt || 0) - (a.updatedAt || 0);
+                // 1. ピン留め優先
+                if (a.isPinned && !b.isPinned) return -1;
+                if (!a.isPinned && b.isPinned) return 1;
+
+                // 2. 選択されたソート順
+                if (sortOrder === 'updated_desc') {
+                    return (b.updatedAt || 0) - (a.updatedAt || 0);
+                } else if (sortOrder === 'end_date_asc') {
+                    const dateA = getFinalEndDate(a); const dateB = getFinalEndDate(b);
+                    if (dateA && !dateB) return -1; if (!dateA && dateB) return 1;
+                    if (dateA && dateB) return new Date(dateA) - new Date(dateB);
+                    return (b.updatedAt || 0) - (a.updatedAt || 0); // 日付が同じなら更新順
+                } else {
+                    // デフォルト: 次回の予定が近い順
+                    const dateA = getNextEventDate(a); const dateB = getNextEventDate(b);
+                    if (dateA && !dateB) return -1; if (!dateA && dateB) return 1;
+                    if (dateA && dateB) return new Date(dateA) - new Date(dateB);
+                    return (b.updatedAt || 0) - (a.updatedAt || 0);
+                }
             });
 
             if (filteredApps.length === 0) { emptyState.classList.remove('hidden'); emptyState.classList.add('flex'); } 
             else { emptyState.classList.add('hidden'); emptyState.classList.remove('flex'); filteredApps.forEach(app => { grid.appendChild(createCompanyCard(app)); }); }
+        }
+
+        // ピン留め切り替え機能
+        async function togglePin(appId, event) {
+            event.stopPropagation(); // モーダルが開くのを防ぐ
+            if (!currentUser) return;
+            const app = applications.find(a => a.id === appId);
+            if (!app) return;
+            
+            const newPinState = !app.isPinned;
+            try {
+                const docRef = doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'applications', appId);
+                await setDoc(docRef, { isPinned: newPinState }, { merge: true });
+                // Note: onSnapshotリスナーが発火して自動的にUIが再描画されます
+            } catch (e) {
+                console.error("Pin update error:", e);
+                showToast("ピン留めの変更に失敗しました", true);
+            }
         }
 
         function createCompanyCard(app) {
@@ -666,10 +824,18 @@
                 mypageHtml = `<span class="text-red-400 text-[9px] font-bold bg-red-50 px-1.5 py-0.5 rounded border border-red-100"><i class="fa-solid fa-circle-exclamation mr-1"></i>マイページ未登録</span>`;
             }
 
-            card.className = `company-card bg-white p-3 rounded-lg shadow-sm border border-slate-200 border-l-[6px] ${borderColorClass} cursor-pointer relative`;
+            // ピンのスタイル判定
+            const pinIconClass = app.isPinned ? "fa-solid fa-thumbtack text-yellow-500" : "fa-solid fa-thumbtack -rotate-45 text-slate-300 hover:text-slate-400 transition-colors";
+
+            card.className = `company-card bg-white p-3 rounded-lg shadow-sm border border-slate-200 border-l-[6px] ${borderColorClass} cursor-pointer relative pr-8`;
             card.onclick = () => openModal(app.id);
             card.innerHTML = `
-                <div class="flex justify-between items-start mb-1"><h3 class="font-bold text-slate-800 text-sm leading-tight truncate flex-1" title="${escapeHtml(app.name)}">${escapeHtml(app.name)}</h3>${tagsHtml ? `<div class="flex-none ml-1">${tagsHtml}</div>` : ''}</div>
+                <!-- ピン留めボタン -->
+                <button onclick="togglePin('${app.id}', event)" class="absolute top-2 right-2 text-lg p-1 z-10" title="ピン留めする/外す">
+                    <i class="${pinIconClass}"></i>
+                </button>
+
+                <div class="flex justify-between items-start mb-1"><h3 class="font-bold text-slate-800 text-sm leading-tight truncate flex-1 pr-1" title="${escapeHtml(app.name)}">${escapeHtml(app.name)}</h3>${tagsHtml ? `<div class="flex-none ml-1">${tagsHtml}</div>` : ''}</div>
                 ${courseHtml}
                 <div class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${badgeClass} mb-1"><i class="fa-solid fa-circle text-[6px] mr-1.5 opacity-60"></i>${escapeHtml(app.status)}</div>
                 ${dateBadge}
@@ -848,11 +1014,11 @@
             switchModalTab(initialTab);
             if (appId) {
                 editingAppId = appId; const app = applications.find(a => a.id === appId); if(!app) return;
-                document.getElementById('app-id').value = app.id; document.getElementById('app-name').value = app.name; document.getElementById('app-industry').value = app.industry || ''; document.getElementById('app-course').value = app.course || ''; document.getElementById('app-url').value = app.url || ''; document.getElementById('app-login-id').value = app.loginId || ''; document.getElementById('app-login-pass').value = app.loginPass || ''; document.getElementById('app-note').value = app.note || ''; document.getElementById('app-es').value = app.esContent || ''; document.getElementById('app-current-step').value = app.status;
+                document.getElementById('app-id').value = app.id; document.getElementById('app-name').value = app.name; document.getElementById('app-industry').value = app.industry || ''; document.getElementById('app-course').value = app.course || ''; document.getElementById('app-url').value = app.url || ''; document.getElementById('app-login-id').value = app.loginId || ''; document.getElementById('app-login-pass').value = app.loginPass || ''; document.getElementById('app-note').value = app.note || ''; document.getElementById('app-es').value = app.esContent || ''; document.getElementById('app-current-step').value = app.status; document.getElementById('app-is-pinned').value = app.isPinned ? "true" : "false";
                 editingFlow = [...(app.flowSteps || DEFAULT_FLOW)]; editingEvents = app.events ? JSON.parse(JSON.stringify(app.events)) : []; editingColor = app.color || 'bg-slate-500';
                 deleteBtn.classList.remove('hidden');
             } else {
-                editingAppId = null; form.reset(); editingFlow = [...DEFAULT_FLOW]; editingEvents = []; editingColor = 'bg-slate-500'; deleteBtn.classList.add('hidden');
+                editingAppId = null; form.reset(); editingFlow = [...DEFAULT_FLOW]; editingEvents = []; editingColor = 'bg-slate-500'; document.getElementById('app-is-pinned').value = "false"; deleteBtn.classList.add('hidden');
             }
             renderFlowList(); renderStatusSelect();
             if (appId) { const app = applications.find(a => a.id === appId); const select = document.getElementById('app-current-step'); if(editingFlow.includes(app.status)) select.value = app.status; }
@@ -888,7 +1054,7 @@
             if(event) event.preventDefault(); if(!currentUser) return;
             const name = document.getElementById('app-name').value; if (!name) { alert('企業名は必須です'); return; }
             const docId = editingAppId || crypto.randomUUID();
-            const newData = { id: docId, name, industry: document.getElementById('app-industry').value, course: document.getElementById('app-course').value, status: document.getElementById('app-current-step').value, url: document.getElementById('app-url').value, loginId: document.getElementById('app-login-id').value, loginPass: document.getElementById('app-login-pass').value, note: document.getElementById('app-note').value, esContent: document.getElementById('app-es').value, flowSteps: editingFlow, events: editingEvents, color: editingColor, updatedAt: Date.now() };
+            const newData = { id: docId, name, industry: document.getElementById('app-industry').value, course: document.getElementById('app-course').value, status: document.getElementById('app-current-step').value, url: document.getElementById('app-url').value, loginId: document.getElementById('app-login-id').value, loginPass: document.getElementById('app-login-pass').value, note: document.getElementById('app-note').value, esContent: document.getElementById('app-es').value, flowSteps: editingFlow, events: editingEvents, color: editingColor, isPinned: document.getElementById('app-is-pinned').value === "true", updatedAt: Date.now() };
             const docRef = doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'applications', docId);
             try { await setDoc(docRef, newData); closeModal(false); showToast('保存しました'); } catch (e) { console.error("Save Application Error:", e); showToast('保存に失敗しました', true); }
         }
@@ -934,7 +1100,7 @@
         }
 
         // Window Object Bindings
-        window.switchView = switchView; window.exportData = exportData; window.importData = importData; window.applyFilter = applyFilter; window.changeMonth = changeMonth; window.resetToToday = resetToToday; window.openCompanySelector = openCompanySelector; window.closeCompanySelector = closeCompanySelector; window.openModal = openModal; window.closeModal = closeModal; window.hideUnsavedWarning = hideUnsavedWarning; window.forceCloseModal = forceCloseModal; window.switchModalTab = switchModalTab; window.addFlowStep = addFlowStep; window.removeFlowStep = removeFlowStep; window.moveFlowStep = moveFlowStep; window.addEvent = addEvent; window.removeEvent = removeEvent; window.saveApplication = saveApplication; window.deleteApplication = deleteApplication; window.selectColor = selectColor; window.openSiteModal = openSiteModal; window.closeSiteModal = closeSiteModal; window.saveSite = saveSite; window.deleteSite = deleteSite; window.loginWithGoogle = loginWithGoogle; window.logout = logout;
+        window.switchView = switchView; window.exportData = exportData; window.importData = importData; window.applyFilter = applyFilter; window.changeMonth = changeMonth; window.resetToToday = resetToToday; window.openCompanySelector = openCompanySelector; window.closeCompanySelector = closeCompanySelector; window.openModal = openModal; window.closeModal = closeModal; window.hideUnsavedWarning = hideUnsavedWarning; window.forceCloseModal = forceCloseModal; window.switchModalTab = switchModalTab; window.addFlowStep = addFlowStep; window.removeFlowStep = removeFlowStep; window.moveFlowStep = moveFlowStep; window.addEvent = addEvent; window.removeEvent = removeEvent; window.saveApplication = saveApplication; window.deleteApplication = deleteApplication; window.selectColor = selectColor; window.openSiteModal = openSiteModal; window.closeSiteModal = closeSiteModal; window.saveSite = saveSite; window.deleteSite = deleteSite; window.loginWithGoogle = loginWithGoogle; window.logout = logout; window.toggleMenu = toggleMenu; window.togglePin = togglePin;
 
     </script>
 </body>
